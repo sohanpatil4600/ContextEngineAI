@@ -70,6 +70,7 @@ class ResearchAssistantFlow(Flow[ResearchAssistantState]):
         openai_api_key: Optional[str] = None,
         zep_api_key: Optional[str] = None,
         firecrawl_api_key: Optional[str] = None,
+        tavily_api_key: Optional[str] = None,
         milvus_db_path: str = "milvus_lite.db",
     ):
         super().__init__()
@@ -94,7 +95,16 @@ class ResearchAssistantFlow(Flow[ResearchAssistantState]):
         # Create agents
         self.rag_agent = self.agents.create_rag_agent(self.rag_pipeline)
         self.memory_agent = self.agents.create_memory_agent(self.memory_layer)
-        self.web_search_agent = self.agents.create_web_search_agent(firecrawl_api_key or os.getenv("FIRECRAWL_API_KEY"))
+        resolved_tavily_key = tavily_api_key or os.getenv("TAVILY_API_KEY")
+        resolved_firecrawl_key = firecrawl_api_key or os.getenv("FIRECRAWL_API_KEY")
+        if resolved_tavily_key:
+            self.web_search_agent = self.agents.create_web_search_agent(
+                tavily_api_key=resolved_tavily_key, provider="tavily"
+            )
+        else:
+            self.web_search_agent = self.agents.create_web_search_agent(
+                firecrawl_api_key=resolved_firecrawl_key, provider="firecrawl"
+            )
         self.tool_calling_agent = self.agents.create_arxiv_agent()
         self.evaluator_agent = self.agents.create_evaluator_agent()
         self.synthesizer_agent = self.agents.create_synthesizer_agent()

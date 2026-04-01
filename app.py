@@ -92,6 +92,7 @@ def check_api_keys() -> Dict[str, bool]:
     api_keys = {
         'OPENAI_API_KEY': bool(os.getenv('OPENAI_API_KEY')),
         'FIRECRAWL_API_KEY': bool(os.getenv('FIRECRAWL_API_KEY')),
+        'TAVILY_API_KEY': bool(os.getenv('TAVILY_API_KEY')),
         'ZEP_API_KEY': bool(os.getenv('ZEP_API_KEY')),
         'VOYAGE_API_KEY': bool(os.getenv('VOYAGE_API_KEY')),
         'TENSORLAKE_API_KEY': bool(os.getenv('TENSORLAKE_API_KEY'))
@@ -115,6 +116,7 @@ class StreamlitResearchAssistant:
                 openai_api_key=os.getenv("OPENAI_API_KEY"),
                 zep_api_key=os.getenv("ZEP_API_KEY"),
                 firecrawl_api_key=os.getenv("FIRECRAWL_API_KEY"),
+                tavily_api_key=os.getenv("TAVILY_API_KEY"),
                 milvus_db_path="milvus_lite.db"
             )
             

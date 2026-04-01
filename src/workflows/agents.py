@@ -4,10 +4,11 @@ from typing import Optional
 
 from src.config import ConfigLoader
 from src.tools import (
-    RAGTool, 
-    MemoryTool, 
-    ArxivTool, 
-    FirecrawlSearchTool
+    RAGTool,
+    MemoryTool,
+    ArxivTool,
+    FirecrawlSearchTool,
+    TavilySearchTool
 )
 from src.rag import RAGPipeline
 from src.memory import ZepMemoryLayer
@@ -40,9 +41,23 @@ class Agents:
             verbose=config.get("verbose", True)
         )
     
-    def create_web_search_agent(self, firecrawl_api_key: str) -> Agent:
+    def create_web_search_agent(self, firecrawl_api_key: str = None, tavily_api_key: str = None, provider: str = "firecrawl") -> Agent:
         config = self.config_loader.get_agent_config("web_search_agent")
-        web_search_tool = FirecrawlSearchTool(api_key=firecrawl_api_key)
+        if provider == "tavily" and tavily_api_key:
+            web_search_tool = TavilySearchTool(api_key=tavily_api_key)
+        else:
+            web_search_tool = FirecrawlSearchTool(api_key=firecrawl_api_key or "")
+        return Agent(
+            role=config["role"],
+            goal=config["goal"],
+            backstory=config["backstory"],
+            tools=[web_search_tool],
+            verbose=config.get("verbose", True)
+        )
+
+    def create_tavily_web_search_agent(self, tavily_api_key: str) -> Agent:
+        config = self.config_loader.get_agent_config("web_search_agent")
+        web_search_tool = TavilySearchTool(api_key=tavily_api_key)
         return Agent(
             role=config["role"],
             goal=config["goal"],
