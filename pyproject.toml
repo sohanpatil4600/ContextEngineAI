@@ -17,6 +17,7 @@ dependencies = [
     "requests>=2.31.0",
     "pydantic>=2.0.0",
     "firecrawl-py>=4.3.0",
+    "tavily-python>=0.5.0",
     "streamlit>=1.49.1",
     "pyyaml>=6.0.2",
 ]
