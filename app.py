@@ -99,10 +99,12 @@ def check_api_keys() -> Dict[str, bool]:
     return api_keys
 
 
+import uuid
+
 class StreamlitResearchAssistant:
-    def __init__(self, user_id: str = "streamlit_user", thread_id: str = "streamlit_session"):
+    def __init__(self, user_id: str = "streamlit_user", thread_id: Optional[str] = None):
         self.user_id = user_id
-        self.thread_id = thread_id
+        self.thread_id = thread_id or f"streamlit_session_{uuid.uuid4().hex[:8]}"
         self.flow = None
         self.initialized = False
     

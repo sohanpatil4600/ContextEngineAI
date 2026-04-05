@@ -25,8 +25,12 @@ class ZepMemoryLayer:
         except:
             self.zep_client.user.add(user_id=self.user_id)
         
-        # Create new session by first deleting the previous one
-        self.zep_client.thread.delete(self.thread_id)
+        # Create new session by first deleting the previous one if it exists
+        try:
+            self.zep_client.thread.delete(self.thread_id)
+        except Exception:
+            pass
+            
         self.zep_client.thread.create(thread_id=self.thread_id, user_id=self.user_id)
 
         self.user_storage = ZepUserStorage(
