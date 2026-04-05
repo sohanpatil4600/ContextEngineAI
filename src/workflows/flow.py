@@ -71,8 +71,13 @@ class ResearchAssistantFlow(Flow[ResearchAssistantState]):
         zep_api_key: Optional[str] = None,
         firecrawl_api_key: Optional[str] = None,
         milvus_db_path: str = "milvus_lite.db",
+        user_id: str = "default_user",
+        thread_id: str = "default_thread",
     ):
         super().__init__()
+        
+        self.state.user_id = user_id
+        self.state.thread_id = thread_id
         
         self.rag_pipeline = RAGPipeline(
             tensorlake_api_key=tensorlake_api_key,

@@ -1,12 +1,12 @@
 import os
 from typing import List, Dict, Any, Optional
 from src.document_processing import TensorLakeClient, RESEARCH_PAPER_SCHEMA
-from src.rag.embeddings import ContextualizedEmbeddings
+from src.rag.embeddings import ContextualizedEmbeddings, SparseEmbeddings, VoyageReRanker
 from src.rag.retriever import MilvusVectorDB
 from src.generation import StructuredResponseGen
 
 class RAGPipeline:
-    """Unified RAG pipeline combining document parsing, embeddings, and retrieval"""
+    """Unified RAG pipeline combining document parsing, dense/sparse embeddings, and reranked retrieval"""
     def __init__(
         self,
         tensorlake_api_key: Optional[str] = None,
@@ -17,6 +17,9 @@ class RAGPipeline:
     ):
         self.doc_parser = TensorLakeClient(api_key=tensorlake_api_key)
         self.embeddings = ContextualizedEmbeddings(api_key=voyage_api_key)
+        self.sparse_embeddings = SparseEmbeddings()
+        self.reranker = VoyageReRanker(api_key=voyage_api_key)
+        
         self.vector_db = MilvusVectorDB(db_path=milvus_db_path, collection_name=collection_name)
         self.generator = StructuredResponseGen(api_key=openai_api_key)
         
@@ -57,8 +60,9 @@ class RAGPipeline:
             if not chunks:
                 raise Exception(f"TensorLake parsing failed for {path}: No valid chunks extracted")
             
-            # Generate contextualized embeddings
-            chunk_texts = [[chunk["text"] for chunk in chunks]]
+            # Generate contextualized embeddings (Dense)
+            flat_chunk_texts = [chunk["text"] for chunk in chunks]
+            chunk_texts = [flat_chunk_texts]
             embeddings_result = self.embeddings.embed_document_chunks(chunk_texts)
             
             if not embeddings_result or len(embeddings_result) == 0:
@@ -67,8 +71,11 @@ class RAGPipeline:
             chunk_embeddings = embeddings_result[0]
             
             if not chunk_embeddings or len(chunk_embeddings) != len(chunks):
-                raise Exception(f"Embedding generation failed for {path}: Chunk count mismatch - {len(chunks)} chunks but {len(chunk_embeddings) if chunk_embeddings else 0} embeddings")
+                raise Exception(f"Embedding generation failed for {path}: Chunk count mismatch.")
             
+            # Generate Sparse Embeddings (BM25)
+            sparse_embeddings_result = self.sparse_embeddings.embed_documents(flat_chunk_texts)
+
             # Prepare metadata for each chunk
             chunk_metadata = []
             for i, chunk in enumerate(chunks):
@@ -79,10 +86,11 @@ class RAGPipeline:
                 }
                 chunk_metadata.append(metadata)
             
-            # Store in vector database with metadata
+            # Store in vector database with metadata and both embedding types
             self.vector_db.insert(
-                chunks=[chunk["text"] for chunk in chunks],
+                chunks=flat_chunk_texts,
                 embeddings=chunk_embeddings,
+                sparse_embeddings=sparse_embeddings_result,
                 metadata=chunk_metadata
             )
             
@@ -97,16 +105,40 @@ class RAGPipeline:
             
         return results
     
-    def retrieve_context(self, query: str, top_k: int = 3) -> List[Dict[str, Any]]:
-        query_embedding = self.embeddings.embed_query(query)
+    def retrieve_context(self, query: str, top_k: int = 3, hybrid_limit: int = 15) -> List[Dict[str, Any]]:
+        # We need a trained BM25 model to query.
+        if not self.sparse_embeddings.is_fit:
+             # Fallback to pure dense search if no documents were processed in this session 
+             # (Milvus Lite limits cross-session BM25 model persistence easily)
+             query_dense_embedding = self.embeddings.embed_query(query)
+             search_results = self.vector_db.search(query_dense_embedding, limit=hybrid_limit)
+        else:
+             # Generate embeddings for both Dense and Sparse
+             query_dense_embedding = self.embeddings.embed_query(query)
+             query_sparse_embedding = self.sparse_embeddings.embed_query(query)
+             
+             # Search vector database using Hybrid Search & RRF
+             search_results = self.vector_db.hybrid_search(
+                 query_dense_embedding=query_dense_embedding,
+                 query_sparse_embedding=query_sparse_embedding,
+                 limit=hybrid_limit
+             )
         
-        # Search vector database
-        search_results = self.vector_db.search(
-            query_embedding=query_embedding,
-            limit=top_k
-        )
+        if not search_results:
+            return []
+            
+        # Cross-Encoder Re-Ranking using Voyage
+        documents_to_rerank = [hit["text"] for hit in search_results]
+        reranked_results = self.reranker.rerank(query=query, documents=documents_to_rerank, top_k=top_k)
         
-        return search_results
+        # Match back to original chunks to restore metadata
+        final_results = []
+        for rank in reranked_results:
+            original_hit = search_results[rank["index"]]
+            original_hit["score"] = rank["relevance_score"] # Inject cross-encoder confidence
+            final_results.append(original_hit)
+            
+        return final_results
     
     def generate_response(
         self, 
@@ -135,3 +167,4 @@ class RAGPipeline:
         }
         
         return response
+

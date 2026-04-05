@@ -9,7 +9,7 @@ from typing import Dict, Any, List, Optional
 from src.workflows import ResearchAssistantFlow
 
 st.set_page_config(
-    page_title="AI Research Assistant",
+    page_title="Context Engine AI",
     page_icon="🔬",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -117,7 +117,9 @@ class StreamlitResearchAssistant:
                 openai_api_key=os.getenv("OPENAI_API_KEY"),
                 zep_api_key=os.getenv("ZEP_API_KEY"),
                 firecrawl_api_key=os.getenv("FIRECRAWL_API_KEY"),
-                milvus_db_path="milvus_lite.db"
+                milvus_db_path="milvus_lite.db",
+                user_id=self.user_id,
+                thread_id=self.thread_id
             )
             
             self.initialized = True
@@ -677,7 +679,7 @@ def main():
     st.markdown('''
         <div style="text-align: center; margin-bottom: 30px;">
             <h1 style='color: #ffffff; font-size: 3rem; font-weight: bold; margin-bottom: 10px;'>
-                🔬 AI Research Assistant
+                🔬 Context Engine AI
             </h1>
             <div style="display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 20px;">
                 <span style='color: #64748b; font-size: 16px; font-weight: 500;'>Powered by</span>
